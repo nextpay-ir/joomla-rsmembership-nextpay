@@ -7,7 +7,7 @@
 /**
  * @plugin RSMembership NextPay Payment
  * @author @FreezeMan
- * @authorEmail register.site0@gmail.com
+ * @authorEmail freezeman.0098@gmail.com
  * @authorUrl http://nextpay.ir
  */
 
@@ -44,17 +44,16 @@ class plgSystemRSMembershipZarinPal extends JPlugin
             if ($plugin != 'rsmembershipnextpay')
                 return;
 
-            include_once ('./nextpay_payment.php');
+            include_once ('nextpay_payment.php');
 
             $api_key = trim($this->params->get('api_key'));
-            $callback_uri = trim($this->params->get('callback_uri'));
 
             $extra_total = 0;
             foreach ($extra as $row) {
                 $extra_total += $row->price;
             }
 
-            $amount = $transaction->price + $extra_total;
+            $Amount = $transaction->price + $extra_total;
 
             $Description = $membership->name;
             $Description = $this->escape($Description);
@@ -68,8 +67,8 @@ class plgSystemRSMembershipZarinPal extends JPlugin
             }
             $transaction->store();
 
-            $CallbackURL = JURI::base() . 'index.php?option=com_rsmembership&nextpayPayment=1&amount=' . $Amount;
-            $CallbackURL = JRoute::_($CallbackURL, false);
+            $callback_uri = JURI::base() . 'index.php?option=com_rsmembership&nextpayPayment=1&amount=' . $Amount;
+            $callback_uri = JRoute::_($callback_uri, false);
             $session =& JFactory::getSession();
             $session->set('transaction_custom', $transaction->custom);
             $session->set('membership_id', $membership->id);
@@ -82,16 +81,14 @@ class plgSystemRSMembershipZarinPal extends JPlugin
 
             $nextpay = new Nextpay_Payment($params);
 
-            $trans_id = $nextpay->TokenGenerator();
+            $result = $nextpay->token();
 
-            if (!$trans_id)
+            if(intval($result->code) == -1) {
+                //$nextpay->send($result->trans_id);
+                $app->redirect("http://api.nextpay.org/payment/{$result->trans_id}");
+            } else {
                 throw new Exception('connection_error');
-            else
-            {
-                $app->redirect("http://api.nextpay.org/payment/{$trans_id}");
-                //$nextpay->send($trans_id);
             }
-
 
         } catch (Exception $e) {
             $message = $this->translate('error_title') . '<br>' . $this->translate($e->getMessage());
@@ -144,14 +141,14 @@ class plgSystemRSMembershipZarinPal extends JPlugin
             $api_key = $input->getString('api_key');
             $amount = $input->getInt('amount');
 
-            include_once ('./nextpay_payment.php');
+            include_once ('nextpay_payment.php');
 
             $params = compact('trans_id', 'api_key', 'amount');
             $nextpay = new Nextpay_Payment($params);
 
-            $verify = $nextpay->PaymentVerifection($params);
+            $verify = $nextpay->verify_request($params);
 
-            if (!$verify)
+            if (!$verify || intval($verify) != 0)
                 throw new Exception('connection_error');
 
             $status = $verify;

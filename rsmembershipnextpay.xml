@@ -4,9 +4,9 @@
 	<author>@FreezeMan</author>
 	<creationDate>August 2016</creationDate>
 	<copyright>Nextpay.ir</copyright>
-	<authorEmail>register.site0@gmail.com</authorEmail>
+	<authorEmail>freezeman.0098@gmail.com</authorEmail>
 	<authorUrl>www.nextpay.ir</authorUrl>
-	<version>1.1.3</version>
+	<version>1.0</version>
 	<description>درگاه پرداخت Nextpay</description>
 	<files>
 		<filename plugin="rsmembershipnextpay">rsmembershipnextpay.php</filename>
@@ -20,7 +20,6 @@
 		<fields name="params">
 			<fieldset name="basic">
 				<field type="text" name="api_key" default="" required="required" class="input-large" size="60" label="NEXTPAY_API_KEY" description="NEXTPAY_API_KEY_DESC"/>
-				<field type="text" name="callback_uri" default="http://www.example.com/callback.html" required="required" class="input-large" size="100" label="NEXTPAY_CALLBACK_URI" description="NEXTPAY_CALLBACK_URI_DESC"/>
 			</fieldset>
 		</fields>
 	</config>
