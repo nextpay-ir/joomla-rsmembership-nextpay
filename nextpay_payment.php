@@ -1,18 +1,21 @@
 <?php
 /**
  * Created by NextPay.ir
- * author: FreezeMan
- * ID: @FreezeMan
- * Date: 7/29/16
+ * author: Nextpay Company
+ * ID: @nextpay
+ * Date: 09/22/2016
  * Time: 5:05 PM
  * Website: NextPay.ir
- * Email: freezeman.0098@gmail.com
+ * Email: info@nextpay.ir
  * @copyright 2016
+ * @package NextPay_Gateway
+ * @version 1.0
  */
 class Nextpay_Payment
 {
     //----- payment properties
     public $api_key = "";
+    public $order_id = "";
     public $amount = 0;
     public $trans_id = "";
     public $params = array();
@@ -24,8 +27,8 @@ class Nextpay_Payment
     //public $request_verify_soap = "http://api.nextpay.org/gateway/verify?wsdl";
     public $request_verify_http = "http://api.nextpay.org/gateway/verify.http";
     public $callback_uri = "http://example.com";
-    private $keys_for_verify = array("api_key","amount","callback_uri");
-    private $keys_for_check = array("api_key","amount","trans_id");
+    private $keys_for_verify = array("api_key","order_id","amount","callback_uri");
+    private $keys_for_check = array("api_key","order_id","amount","trans_id");
 
     //----- controller properties
     public $default_verify = Type_Verify::SoapClient;
@@ -34,11 +37,13 @@ class Nextpay_Payment
      * Nextpay_Payment constructor.
      * @param array|bool $params
      * @param string|bool $api_key
+     * @param string|bool $order_id
      * @param string|bool $url
      * @param int|bool $amount
      */
-    public function __construct($params=false, $api_key=false, $amount=false, $url=false)
+    public function __construct($params=false, $api_key=false, $order_id=false, $amount=false, $url=false)
     {
+        $trust = true;
         if(is_array($params))
         {
             foreach ($this->keys_for_verify as $key )
@@ -48,19 +53,31 @@ class Nextpay_Payment
                     $error = "<h2>آرایه ارسالی دارای مشکل میباشد.</h2>";
                     $error .= "<h4>نمونه مثال برای آرایه ارسالی.</h4>";
                     $error .= /** @lang text */
-                        "<pre>
-                            array(\"api_key\"=>\"شناسه api\",
-                                    \"amount\"=>\"مبلغ\",
-                                    \"callback_uri\"=>\"مسیر باگشت\")
+                        "<pre>                        
+                        array(\"api_key\"=>\"شناسه api\",
+                              \"order_id\"=>\"شماره فاکتور\",
+                              \"amount\"=>\"مبلغ\",
+                              \"callback_uri\"=>\"مسیر باگشت\")
 
                         </pre>";
+                    $trust = false;
                     $this->show_error($error);
+                    break;
                 }
             }
-            $this->params = $params;
-            $this->api_key = $params['api_key'];
-            $this->amount = $params['amount'];
-            $this->callback_uri = $params['callback_uri'];
+            if($trust)
+            {
+                $this->params = $params;
+                $this->api_key = $params['api_key'];
+                $this->order_id = $params['order_id'];
+                $this->amount = $params['amount'];
+                $this->callback_uri = $params['callback_uri'];
+            }
+            else
+            {
+                $this->show_error("برای مقدارهی پارامتر ها باید بصورت آرایه اقدام نمایید");
+                exit("End with Error!!!");
+            }
         }
         else
         {
@@ -68,6 +85,11 @@ class Nextpay_Payment
                 $this->api_key = $api_key;
             //else
             //    $this->show_error("شناسه مربوط به api مقدار دهی نشده است");
+
+            if($order_id)
+                $this->order_id = $order_id;
+            //else
+            //    $this->show_error("شماره فاکتور مقداردهی نشده است");
 
             if($amount)
                 $this->amount = $amount;
@@ -81,6 +103,7 @@ class Nextpay_Payment
 
             $this->params = array(
                 "api_key"=>$this->api_key,
+                "order_id"=>$this->order_id,
                 "amount"=>$this->amount,
                 "callback_uri"=>$this->callback_uri);
         }
@@ -167,12 +190,12 @@ class Nextpay_Payment
                     if( !$this->cURLcheckBasicFunctions() ) $this->show_error("UNAVAILABLE: cURL Basic Functions");
                     $curl = curl_init();
                     curl_setopt($curl, CURLOPT_URL, $this->server_http);
-                    curl_setopt($curl, CURLOPT_POST, 1);
+                    curl_setopt($curl, CURLOPT_POST, true);
                     curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
                     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($curl, CURLOPT_POSTFIELDS,
-                        "api_key=".$this->api_key."&amount=".$this->amount."&callback_uri=".$this->callback_uri);
+                        "api_key=".$this->api_key."&order_id=".$this->order_id."&amount=".$this->amount."&callback_uri=".$this->callback_uri);
                     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
                     /** @var int | string $server_output */
                     $res = json_decode(curl_exec ($curl));
@@ -224,13 +247,19 @@ class Nextpay_Payment
     {
         if(isset($trans_id))
         {
-            header('Location: '.$this->request_http."/$trans_id");
-            exit(0);
+            header_remove();
+            ob_clean();
+            if (headers_sent()) {
+                echo "<script> location.replace(\"".$this->request_http."/$trans_id"."\"); </script>";
+            }
+            else
+            {
+                header('Location: '.$this->request_http."/$trans_id");
+                exit(0);
+            }
         }
         else
-        {
             $this->show_error("empty trans_id param send");
-        }
     }
 
     /**
@@ -238,11 +267,13 @@ class Nextpay_Payment
      * @param string|bool $api_key
      * @param string|bool $trans_id
      * @param int|bool $amount
+     * @param string|bool $order_id
      * @return int|mixed
      */
-    public function verify_request($params=false, $api_key=false, $trans_id=false, $amount=false)
+    public function verify_request($params=false, $api_key=false, $order_id=false, $trans_id=false, $amount=false)
     {
         $res = 0;
+        $trust = true;
         if(is_array($params))
         {
             foreach ($this->keys_for_check as $key )
@@ -254,38 +285,63 @@ class Nextpay_Payment
                     $error .= /** @lang text */
                         "<pre>
                             array(\"api_key\"=>\"شناسه api\",
-                                    \"amount\"=>\"مبلغ\",
-                                    \"trans_id\"=>\"شماره تراکنش\")
+                                  \"order_id\"=>\"شماره فاکتور\",
+                                  \"amount\"=>\"مبلغ\",
+                                  \"trans_id\"=>\"شماره تراکنش\")
 
                         </pre>";
+                    $trust = false;
                     $this->show_error($error);
+                    break;
                 }
             }
-
-            $this->trans_id = $params['trans_id'];
-            $this->api_key = $params['api_key'];
-            $this->amount = $params['amount'];
-
+            if($trust)
+            {
+                $this->trans_id = $params['trans_id'];
+                $this->api_key = $params['api_key'];
+                $this->order_id = $params['order_id'];
+                $this->amount = $params['amount'];
+            }
+            else
+            {
+                $this->show_error("برای مقدارهی پارامتر ها باید بصورت آرایه اقدام نمایید");
+                exit("End with Error!!!");
+            }
         }
 
-        if($api_key)
+        if($api_key){
             $this->api_key = $api_key;
-        elseif ($this->api_key)
+            $this->params['api_key'] = $api_key;
+        }elseif (isset($this->api_key)) {
             $this->params['api_key'] = $this->api_key;
+        }
         //else
         //    $this->show_error("شناسه مربوط به api مقدار دهی نشده است");
 
-        if($amount)
+        if($order_id){
+            $this->order_id = $order_id;
+            $this->params['order_id'] = $order_id;
+        }elseif (isset($this->order_id)){
+            $this->params['order_id'] = $this->order_id;
+        }
+        //else
+        //    $this->show_error("شماره فاکتور مقداردهی نشده است");
+
+        if($amount){
             $this->amount = $amount;
-        elseif ($this->amount)
+            $this->params['amount'] = $amount;
+        }elseif (isset($this->amount)){
             $this->params['amount'] = $this->amount;
+        }
         //else
         //    $this->show_error("مبلغ تعیین نشده است");
 
-        if($trans_id)
+        if($trans_id){
             $this->trans_id = $trans_id;
-        elseif ($this->trans_id)
+            $this->params['trans_id'] = $trans_id;
+        }elseif (isset($this->trans_id)){
             $this->params['trans_id'] = $this->trans_id;
+        }
         //else
         //    $this->show_error("شماره نراکنش تعیین نشده است");
 
@@ -301,7 +357,6 @@ class Nextpay_Payment
                     $res = $res->PaymentVerifectionResult;
 
                     if ($res != "" && $res != NULL && is_object($res)) {
-                        //$this->code_error($res->code);
                         $res = $res->code;
                     }
                     else
@@ -342,10 +397,6 @@ class Nextpay_Payment
                         $res = $res['PaymentVerifectionResult'];
 
                         if ($res != "" && $res != NULL && is_array($res)) {
-                            /*if (intval($res['code']) == -1)
-                                $this->trans_id = $res['trans_id'];
-                            else
-                                $this->code_error($res['code']);*/
                             $res = $res['code'];
                         }
                         else
@@ -367,18 +418,13 @@ class Nextpay_Payment
                     curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
                     curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
                     curl_setopt($curl, CURLOPT_POSTFIELDS,
-                        "api_key=".$this->api_key."&amount=".$this->amount."&trans_id=".$this->trans_id);
+                        "api_key=".$this->api_key."&order_id=".$this->order_id."&amount=".$this->amount."&trans_id=".$this->trans_id);
                     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
                     /** @var int | string $server_output */
                     $res = json_decode(curl_exec ($curl));
                     curl_close ($curl);
 
                     if ($res != "" && $res != NULL && is_object($res)) {
-
-                        /*if (intval($res->code) == -1)
-                            $this->trans_id = $res->trans_id;
-                        else
-                            $this->code_error($res->code);*/
                         $res = $res->code;
                     }
                     else
@@ -397,7 +443,6 @@ class Nextpay_Payment
                     $res = $res->PaymentVerifectionResult;
 
                     if ($res != "" && $res != NULL && is_object($res)) {
-                        //$this->code_error($res->code);
                         $res = $res->code;
                     }
                     else
@@ -428,25 +473,25 @@ class Nextpay_Payment
         $error_code = intval($error_code);
         $error_array = array(
             0 => "time ago request payment is complete transaction,please check status only.",
-            2 => "Bank not response status.",
-            3 => "pending to payment request.",
-            4 => "Cancel status trans_id.",
-            20 => "api key is not send",
-            21 => "empty trans_id param send",
-            22 => "amount in not send",
-            23 => "callback in not send",
-            30 => "amount less 100 toman",
-            33 => "api key incorrect type or not exist",
-            34 => "not exist or not valid transaction",
-            35 => "api key incorrect type for this request.",
-            36 => "ResNum from bank not valid to send",
-            40 => "not active or invalid api key",
-            41 => "Bank gateway is deactivated",
-            42 => "system payment has been problem.",
-            43 => "gateway selection not exist,please reselect bank gateway",
-            45 => "payment system deactivate temporary",
-            46 => "No result,wrong request",
-            55 => "empty trans_id param send"
+            -2 => "Bank not response status.",
+            -3 => "pending to payment request.",
+            -4 => "Cancel status trans_id.",
+            -20 => "api key is not send",
+            -21 => "empty trans_id param send",
+            -22 => "amount in not send",
+            -23 => "callback in not send",
+            -30 => "amount less 100 toman",
+            -33 => "api key incorrect type or not exist",
+            -34 => "not exist or not valid transaction",
+            -35 => "api key incorrect type for this request.",
+            -36 => "ResNum from bank not valid to send",
+            -40 => "not active or invalid api key",
+            -41 => "Bank gateway is deactivated",
+            -42 => "system payment has been problem.",
+            -43 => "gateway selection not exist,please reselect bank gateway",
+            -45 => "payment system deactivate temporary",
+            -46 => "No result,wrong request",
+            -55 => "empty trans_id param send"
         );
 
         echo "<h2>code error : {$error_code}</h2>";
@@ -479,6 +524,14 @@ class Nextpay_Payment
     public function getApiKey()
     {
         return $this->api_key;
+    }
+
+    /**
+     * @return string
+     */
+    public function getOrderId()
+    {
+        return $this->order_id;
     }
 
     /**
@@ -524,11 +577,21 @@ class Nextpay_Payment
     }
 
     /**
+     * @param bool|string $order_id
+     */
+    public function setOrderId($order_id)
+    {
+        $this->order_id = $order_id;
+        $this->params['order_id'] = $this->order_id;
+    }
+
+    /**
      * @param string $trans_id
      */
     public function setTransId($trans_id)
     {
         $this->trans_id = $trans_id;
+        $this->params['trans_id'] = $this->trans_id;
     }
 
     /**
@@ -545,25 +608,44 @@ class Nextpay_Payment
      */
     public function setParams($params)
     {
+        $trust = true;
         if(is_array($params))
         {
-            foreach ($this->keys_param as $key )
+            if (isset($this->keys_for_verify))
             {
-                if(!array_key_exists($key,$params))
+                foreach ($this->keys_for_verify as $key )
                 {
-                    $error = "<h2>آرایه ارسالی دارای مشکل میباشد.</h2>";
-                    $error .= "<h4>نمونه مثال برای آرایه ارسالی.</h4>";
-                    $error .= /** @lang text */
-                        "<pre>
-                            array(\"api_key\"=>\"شناسه api\",
-                                    \"amount\"=>\"مبلغ\",
-                                    \"callback_uri\"=>\"مسیر باگشت\")
-
-                        </pre>";
-                    $this->show_error($error);
+                    if(!array_key_exists($key,$params))
+                    {
+                        $trust = false;
+                        $error = "<h2>آرایه ارسالی دارای مشکل میباشد.</h2>";
+                        $error .= "<h4>نمونه مثال برای آرایه ارسالی.</h4>";
+                        $error .= /** @lang text */
+                            "<pre>
+                                array(\"api_key\"=>\"شناسه api\",
+                                      \"order_id\"=>\"شماره فاکتور\",
+                                      \"amount\"=>\"مبلغ\",
+                                      \"callback_uri\"=>\"مسیر باگشت\")
+    
+                            </pre>";
+                        $this->show_error($error);
+                        break;
+                    }
                 }
             }
-            $this->params = $params;
+            else
+                $this->show_error("برای مقدارهی پارامتر ها باید بصورت آرایه اقدام نمایید");
+            if($trust)
+            {
+                $this->params = $params;
+                $this->api_key = $params['api_key'];
+                $this->order_id = $params['order_id'];
+                $this->amount = $params['amount'];
+                $this->callback_uri = $params['callback_uri'];
+            }
+            else
+                $this->show_error("برای مقدارهی پارامتر ها باید بصورت آرایه اقدام نمایید");
+
         }
         else
             $this->show_error("برای مقدارهی پارامتر ها باید بصورت آرایه اقدام نمایید");
@@ -574,7 +656,22 @@ class Nextpay_Payment
      */
     public function setDefaultVerify($default_verify)
     {
-        $this->default_verify = $default_verify;
+        switch ($default_verify){
+            case 0:
+            case Type_Verify::NuSoap:
+                $this->default_verify = Type_Verify::NuSoap;
+                break;
+            case 1:
+            case Type_Verify::SoapClient:
+                $this->default_verify = Type_Verify::SoapClient;
+                break;
+            case 2:
+            case Type_Verify::Http:
+                $this->default_verify = Type_Verify::Http;
+                break;
+            default:
+                $this->default_verify = Type_Verify::SoapClient;
+        }
     }
 }
 

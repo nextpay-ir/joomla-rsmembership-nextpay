@@ -6,8 +6,8 @@
  */
 /**
  * @plugin RSMembership NextPay Payment
- * @author @FreezeMan
- * @authorEmail freezeman.0098@gmail.com
+ * @author @nextpay
+ * @authorEmail info@nextpay.ir
  * @authorUrl http://nextpay.ir
  */
 
@@ -54,14 +54,14 @@ class plgSystemRSMembershipZarinPal extends JPlugin
             }
 
             $Amount = $transaction->price + $extra_total;
-
+            $order_id = time();
             $Description = $membership->name;
             $Description = $this->escape($Description);
 
             $Email = $data->email;
             $Mobile = '';
 
-            $transaction->custom = md5($transaction->params . ' ' . time());
+            $transaction->custom = md5($transaction->params . ' ' . $order_id);
             if ($membership->activation == 2) {
                 $transaction->status = 'completed';
             }
@@ -75,6 +75,7 @@ class plgSystemRSMembershipZarinPal extends JPlugin
 
             $params = compact(
                 'api_key',
+                'order_id',
                 'amount',
                 'callback_uri'
             );
@@ -138,12 +139,13 @@ class plgSystemRSMembershipZarinPal extends JPlugin
                 throw new Exception('payment_failed');
 
             $trans_id = $this->params->get('trans_id');
+            $order_id = $this->params->get('order_id');
             $api_key = $input->getString('api_key');
             $amount = $input->getInt('amount');
 
             include_once ('nextpay_payment.php');
 
-            $params = compact('trans_id', 'api_key', 'amount');
+            $params = compact('trans_id', 'api_key', 'order_id', 'amount');
             $nextpay = new Nextpay_Payment($params);
 
             $verify = $nextpay->verify_request($params);
