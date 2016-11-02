@@ -15,7 +15,7 @@ ini_set('display_errors', 1);
 defined('_JEXEC') or die('Restricted access');
 require_once JPATH_ADMINISTRATOR . '/components/com_rsmembership/helpers/rsmembership.php';
 
-class plgSystemRSMembershipZarinPal extends JPlugin
+class plgSystemRSMembershipNextPay extends JPlugin
 {
     public function __construct(&$subject, $config)
     {
@@ -53,10 +53,8 @@ class plgSystemRSMembershipZarinPal extends JPlugin
                 $extra_total += $row->price;
             }
 
-            $Amount = $transaction->price + $extra_total;
+            $amount = $transaction->price + $extra_total;
             $order_id = time();
-            $Description = $membership->name;
-            $Description = $this->escape($Description);
 
             $Email = $data->email;
             $Mobile = '';
@@ -67,7 +65,7 @@ class plgSystemRSMembershipZarinPal extends JPlugin
             }
             $transaction->store();
 
-            $callback_uri = JURI::base() . 'index.php?option=com_rsmembership&nextpayPayment=1&amount=' . $Amount;
+            $callback_uri = JURI::base() . 'index.php?option=com_rsmembership&nextpayPayment=1&amount=' . $amount;
             $callback_uri = JRoute::_($callback_uri, false);
             $session =& JFactory::getSession();
             $session->set('transaction_custom', $transaction->custom);
@@ -138,9 +136,9 @@ class plgSystemRSMembershipZarinPal extends JPlugin
             if (!$this->params->get('trans_id'))
                 throw new Exception('payment_failed');
 
-            $trans_id = $this->params->get('trans_id');
-            $order_id = $this->params->get('order_id');
-            $api_key = $input->getString('api_key');
+            $trans_id = $input->getString('trans_id');
+            $order_id = $input->getString('order_id');
+            $api_key = $this->params->get('api_key');
             $amount = $input->getInt('amount');
 
             include_once ('nextpay_payment.php');
